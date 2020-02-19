@@ -1,0 +1,38 @@
+version: 2
+jobs:
+  main_test:
+    docker:
+      - image: tiennd97/php5.6-apache:1.4
+        environment:
+          DEBUG: true
+          DATABASE_URL: "mysql://root:password@127.0.0.1/cisample?encoding=utf8mb4&timezone=UTC&cacheMetadata=true"
+          DATABASE_TEST_URL: "mysql://root:password@127.0.0.1/cisample?encoding=utf8mb4&timezone=UTC&cacheMetadata=true"
+      - image: circleci/mysql:5.7
+        command: mysqld  --character-set-server=utf8mb4 --collation-server=utf8mb4_general_ci
+        environment:
+          MYSQL_DATABASE: cisample
+          MYSQL_ROOT_PASSWORD: password
+    working_directory: /var/www/circle-ci
+    steps:
+      - restore_cache:
+          key: circle-ci-cakephp-{{ .Branch }}
+      - checkout
+      - run:
+          name: Install dependency 
+          command: composer install --dev --no-interaction
+      - run:
+          name: Install Framgia-ci tool
+          command: curl -o /usr/bin/framgia-ci https://raw.githubusercontent.com/framgia/ci-report-tool/master/dist/framgia-ci && chmod +x /usr/bin/framgia-ci
+      - save_cache:
+          key: circle-ci-cakephp-{{ .Branch }}
+          paths:
+            - "/home/ubuntu/.composer/cache"
+      - run:
+          name: create test repot dir
+          command: mkdir -p $CIRCLE_TEST_REPORTS/phpunit
+      - run:
+          name: Wait for MySQL DB
+          command: dockerize -wait tcp://localhost:3306 -timeout 1m
+      - run:
+          name: Initialize Database
+          command: bin/cake migrations migrate
